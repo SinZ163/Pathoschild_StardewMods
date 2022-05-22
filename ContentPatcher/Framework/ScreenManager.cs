@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using ContentPatcher.Framework.Conditions;
@@ -197,8 +198,13 @@ namespace ContentPatcher.Framework
         /// <param name="updateType">The context update type.</param>
         public void UpdateContext(ContextUpdateType updateType)
         {
+            var sw = new Stopwatch();
+            sw.Restart();
             this.TokenManager.UpdateContext(out IInvariantSet changedGlobalTokens);
+            var tmTime = new TimeSpan(sw.Elapsed.Ticks);
             this.PatchManager.UpdateContext(this.Helper.GameContent, changedGlobalTokens, updateType);
+            sw.Stop();
+            this.Monitor.Log($"ScreenManager.UpdateContext took {sw.Elapsed.TotalMilliseconds:N}ms (token took {tmTime.TotalMilliseconds:N}ms, patch took {(sw.Elapsed.TotalMilliseconds - tmTime.TotalMilliseconds):N}ms)");
         }
 
 

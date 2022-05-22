@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Text;
@@ -118,6 +119,8 @@ namespace ContentPatcher.Framework
         public void UpdateContext(IGameContentHelper contentHelper, IInvariantSet globalChangedTokens, ContextUpdateType updateType)
         {
             this.Monitor.VerboseLog($"Updating context for {updateType} tick...");
+            var sw = new Stopwatch();
+            sw.Restart();
 
             // Patches can have variable update rates, so we keep track of updated tokens here so
             // we update patches at their next update point.
@@ -149,10 +152,12 @@ namespace ContentPatcher.Framework
 
                 globalChangedTokens = affectedTokens.Lock();
             }
+            var timerTokenUpdate = new TimeSpan(sw.Elapsed.Ticks);
 
             // get changes to apply
             Queue<IPatch> patchQueue = new Queue<IPatch>(this.GetPatchesToUpdate(globalChangedTokens, updateType));
             ISet<IAssetName> reloadAssetNames = new HashSet<IAssetName>(this.AssetsWithRemovedPatches);
+            var timerPatchQueue = new TimeSpan(sw.Elapsed.Ticks);
             if (!patchQueue.Any() && !reloadAssetNames.Any())
                 return;
 
@@ -166,6 +171,13 @@ namespace ContentPatcher.Framework
             List<PatchAuditChange>? verbosePatchesReloaded = this.Monitor.IsVerbose
                 ? new()
                 : null;
+
+            var swTrackLocalTokens = new Stopwatch();
+            swTrackLocalTokens.Reset();
+            var swUpdateContext = new Stopwatch();
+            swUpdateContext.Reset();
+            var swTargetChanges = new Stopwatch();
+            swTargetChanges.Reset();
 
             // update patches
             IAssetName? prevAssetName = null;
@@ -188,7 +200,10 @@ namespace ContentPatcher.Framework
                 bool wasReady = patch.IsReady && !wasPending.Contains(patch);
 
                 // update patch
+                swTrackLocalTokens.Start();
                 IContext tokenContext = this.TokenManager.TrackLocalTokens(patch.ContentPack);
+                swTrackLocalTokens.Stop();
+                swUpdateContext.Start();
                 bool changed;
                 try
                 {
@@ -200,6 +215,7 @@ namespace ContentPatcher.Framework
                     this.Monitor.Log(ex.ToString());
                     changed = false;
                 }
+                swUpdateContext.Stop();
                 bool isReady = patch.IsReady;
 
                 // handle specific patch types
@@ -253,9 +269,11 @@ namespace ContentPatcher.Framework
                         reloadAssetNames.Add(patch.TargetAsset);
                 }
 
+                swTargetChanges.Start();
                 // track whether the target asset changed
                 if (!anyTargetsChanged)
                     anyTargetsChanged = !wasTargetAsset?.IsEquivalentTo(patch.TargetAsset) ?? patch.TargetAsset is not null;
+                swTargetChanges.Stop();
 
                 // log change
                 verbosePatchesReloaded?.Add(new PatchAuditChange(patch, wasReady, wasFromAsset, wasTargetAsset, reloadAsset));
@@ -264,7 +282,7 @@ namespace ContentPatcher.Framework
                     IList<string> changes = new List<string>();
                     if (wasReady != isReady)
                         changes.Add(isReady ? "enabled" : "disabled");
-                    if (wasTargetAsset != patch.TargetAsset)
+                    if (wasTargetAsset != null && patch.TargetAsset != null && !wasTargetAsset.IsEquivalentTo(patch.TargetAsset))
                         changes.Add($"target: {wasTargetAsset} => {patch.TargetAsset}");
                     string changesStr = string.Join(", ", changes);
 
@@ -272,9 +290,13 @@ namespace ContentPatcher.Framework
                 }
             }
 
+            var timerPatchQueueProcess = new TimeSpan(sw.Elapsed.Ticks);
+
             // reset indexes if targets changed
             if (anyTargetsChanged)
                 this.Reindex(patchListChanged: false);
+
+            var timerReindex = new TimeSpan(sw.Elapsed.Ticks);
 
             // log changes
             if (verbosePatchesReloaded?.Count > 0)
@@ -300,7 +322,7 @@ namespace ContentPatcher.Framework
                         notes.Add(patch.IsReady ? "=> ready" : "=> not ready");
                     if (entry.WasFromAsset != patch.FromAsset)
                         notes.Add($"{nameof(patch.FromAsset)} '{entry.WasFromAsset}' => '{patch.FromAsset}'");
-                    if (entry.WasTargetAsset != patch.TargetAsset)
+                    if (entry.WasTargetAsset != null && patch.TargetAsset != null && !entry.WasTargetAsset.IsEquivalentTo(patch.TargetAsset))
                         notes.Add($"{nameof(patch.TargetAsset)} '{entry.WasTargetAsset}' => '{patch.TargetAsset}'");
 
                     report.AppendLine($"   - {patch.Type} {patch.Path}");
@@ -310,6 +332,7 @@ namespace ContentPatcher.Framework
 
                 this.Monitor.Log(report.ToString());
             }
+            var timerVerboseLogging = new TimeSpan(sw.Elapsed.Ticks);
 
             // reload assets if needed
             if (reloadAssetNames.Any())
@@ -323,6 +346,16 @@ namespace ContentPatcher.Framework
                     return match;
                 });
             }
+            sw.Stop();
+            this.Monitor.Log(@$"PatchManager.UpdateContext took {sw.Elapsed.TotalMilliseconds:N}ms
+     timerTokenUpdate:      {timerTokenUpdate.TotalMilliseconds:N}ms
+     timerPatchQueue:       {(timerPatchQueue.TotalMilliseconds - timerTokenUpdate.TotalMilliseconds):N}ms
+     timerPatchQueueProcess {(timerPatchQueueProcess.TotalMilliseconds - timerPatchQueue.TotalMilliseconds):N}ms
+        - trackLocalTokens    {swTrackLocalTokens.Elapsed.TotalMilliseconds:N}ms
+        - updateContext       {swUpdateContext.Elapsed.TotalMilliseconds:N}ms
+        - reIndex Target      {swTargetChanges.Elapsed.TotalMilliseconds:N}ms
+     reIndex:               {(timerReindex.TotalMilliseconds - timerPatchQueueProcess.TotalMilliseconds):N}ms ({anyTargetsChanged})
+     reloadAssets:          {(sw.Elapsed.TotalMilliseconds - timerVerboseLogging.TotalMilliseconds):N}ms");
         }
 
         /****
