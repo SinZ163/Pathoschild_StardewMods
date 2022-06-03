@@ -29,7 +29,7 @@ namespace ContentPatcher.Framework.Tokens.ValueProviders
         }
 
         /// <inheritdoc />
-        public override bool UpdateContext(IContext context)
+        public override bool UpdateContext(IContext context, ref IndentedTextWriter diagnostics)
         {
             bool changed = !this.IsReady;
             this.MarkReady(true);

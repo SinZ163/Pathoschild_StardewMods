@@ -181,8 +181,9 @@ namespace ContentPatcher.Framework
             bool localTokensChanged = false;
             foreach (IToken token in this.LocalContext.GetTokens(enforceContext: false))
             {
+                var writer = new IndentedTextWriter();
                 if (token.IsMutable)
-                    localTokensChanged |= token.UpdateContext(this);
+                    localTokensChanged |= token.UpdateContext(this, ref writer);
             }
 
             // reset dynamic tokens
@@ -202,7 +203,8 @@ namespace ContentPatcher.Framework
 
                 foreach (DynamicTokenValue tokenValue in this.DynamicTokenValues)
                 {
-                    tokenValue.UpdateContext(this);
+                    var writer = new IndentedTextWriter();
+                    tokenValue.UpdateContext(this, ref writer);
                     if (tokenValue.IsReady && tokenValue.Conditions.All(p => p.IsMatch))
                     {
                         ManualValueProvider valueProvider = tokenValue.ParentToken.ValueProvider;

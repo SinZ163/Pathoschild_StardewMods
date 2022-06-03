@@ -89,6 +89,8 @@ namespace ContentPatcher
         /// <summary>Whether the next tick is the first one for the main screen.</summary>
         private bool IsFirstTick = true;
 
+        internal static IMonitor StaticMonitor = null!; // Set in entry
+
 
         /*********
         ** Public methods
@@ -97,6 +99,7 @@ namespace ContentPatcher
         /// <param name="helper">Provides simplified APIs for writing mods.</param>
         public override void Entry(IModHelper helper)
         {
+            StaticMonitor = this.Monitor;
             this.Config = helper.ReadConfig<ModConfig>();
 
             this.ScreenManager = new(this.CreateScreenManager);

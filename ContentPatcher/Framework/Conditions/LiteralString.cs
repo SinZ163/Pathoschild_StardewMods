@@ -52,7 +52,7 @@ namespace ContentPatcher.Framework.Conditions
         }
 
         /// <inheritdoc />
-        public bool UpdateContext(IContext context)
+        public bool UpdateContext(IContext context, ref IndentedTextWriter diagnostics)
         {
             return false;
         }

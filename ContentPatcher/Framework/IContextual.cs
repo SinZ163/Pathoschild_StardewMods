@@ -11,7 +11,7 @@ namespace ContentPatcher.Framework
         /// <summary>Update the instance when the context changes.</summary>
         /// <param name="context">Provides access to contextual tokens.</param>
         /// <returns>Returns whether the instance changed.</returns>
-        bool UpdateContext(IContext context);
+        bool UpdateContext(IContext context, ref IndentedTextWriter diagnostics);
 
         /// <summary>Get diagnostic info about the contextual instance.</summary>
         IContextualState GetDiagnosticState();

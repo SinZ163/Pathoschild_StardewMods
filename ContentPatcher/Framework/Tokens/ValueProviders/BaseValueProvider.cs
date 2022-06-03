@@ -61,7 +61,7 @@ namespace ContentPatcher.Framework.Tokens.ValueProviders
         ** Public methods
         *********/
         /// <inheritdoc />
-        public virtual bool UpdateContext(IContext context)
+        public virtual bool UpdateContext(IContext context, ref IndentedTextWriter diagnostics)
         {
             return false;
         }

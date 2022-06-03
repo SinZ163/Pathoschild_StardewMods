@@ -45,7 +45,7 @@ namespace ContentPatcher.Framework.Tokens.Json
         }
 
         /// <inheritdoc />
-        public bool UpdateContext(IContext context)
+        public bool UpdateContext(IContext context, ref IndentedTextWriter diagnostics)
         {
             return this.Contextuals.UpdateContext(context);
         }

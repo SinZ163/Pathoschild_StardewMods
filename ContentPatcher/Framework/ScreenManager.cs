@@ -1,5 +1,7 @@
 using System;
+using System.CodeDom.Compiler;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using ContentPatcher.Framework.Conditions;
@@ -197,8 +199,13 @@ namespace ContentPatcher.Framework
         /// <param name="updateType">The context update type.</param>
         public void UpdateContext(ContextUpdateType updateType)
         {
+            var sw = new Stopwatch();
+            sw.Restart();
             this.TokenManager.UpdateContext(out IInvariantSet changedGlobalTokens);
+            var tmTime = new TimeSpan(sw.Elapsed.Ticks);
             this.PatchManager.UpdateContext(this.Helper.GameContent, changedGlobalTokens, updateType);
+            sw.Stop();
+            this.Monitor.Log($"ScreenManager.UpdateContext took {sw.Elapsed.TotalMilliseconds:N}ms (token took {tmTime.TotalMilliseconds:N}ms, patch took {(sw.Elapsed.TotalMilliseconds - tmTime.TotalMilliseconds):N}ms)");
         }
 
 
@@ -212,11 +219,16 @@ namespace ContentPatcher.Framework
         [SuppressMessage("ReSharper", "AccessToModifiedClosure", Justification = "The value is used immediately, so this isn't an issue.")]
         private void LoadContentPacks(IEnumerable<LoadedContentPack> contentPacks, IInvariantSet installedMods)
         {
+            var loadInfo = new List<(LoadedContentPack Mod, double TotalDuration, string msg)>();
             // load content packs
             foreach (LoadedContentPack current in contentPacks)
             {
                 this.Monitor.VerboseLog($"Loading content pack '{current.Manifest.Name}'...");
-
+                var sw = Stopwatch.StartNew();
+                var timerLoadTokens = TimeSpan.Zero;
+                var timerLoadAlias = TimeSpan.Zero;
+                var timerLoadPatchs = TimeSpan.Zero;
+                IndentedTextWriter patchTimerMsg = new IndentedTextWriter();
                 try
                 {
                     ContentConfig content = current.Content;
@@ -306,6 +318,7 @@ namespace ContentPatcher.Framework
                             modContext.AddDynamicToken(entry.Name, values, conditions);
                         }
                     }
+                    timerLoadTokens = new TimeSpan(sw.Elapsed.Ticks);
 
                     // load alias token names
                     {
@@ -331,6 +344,9 @@ namespace ContentPatcher.Framework
                                 modContext.AddAliasTokenName(key, value);
                         }
                     }
+                    timerLoadAlias = new TimeSpan(sw.Elapsed.Ticks);
+
+                    patchTimerMsg.Indent = 2;
 
                     // load patches
                     this.PatchLoader.LoadPatches(
@@ -339,8 +355,11 @@ namespace ContentPatcher.Framework
                         rootIndexPath: new[] { current.Index },
                         path: current.LogPath,
                         reindex: false,
-                        parentPatch: null
+                        parentPatch: null,
+                        ref patchTimerMsg
                     );
+
+                    timerLoadPatchs = new TimeSpan(sw.Elapsed.Ticks);
 
                     // load custom locations
                     foreach (CustomLocationConfig? location in content.CustomLocations)
@@ -353,7 +372,19 @@ namespace ContentPatcher.Framework
                 {
                     this.Monitor.Log($"Error loading content pack '{current.Manifest.Name}'. Technical details:\n{ex}", LogLevel.Error);
                 }
+                sw.Stop();
+                loadInfo.Add((current, sw.Elapsed.TotalMilliseconds,
+                    $"{current.Manifest.Name} took {sw.Elapsed.TotalMilliseconds:N}ms loading content pack\n" +
+                    $"\t- loadTokens: {timerLoadTokens.TotalMilliseconds:N}\n" +
+                    $"\t- loadAlias: {(timerLoadAlias.TotalMilliseconds - timerLoadTokens.TotalMilliseconds):N}\n" +
+                    $"\t- loadPatch (Total): {timerLoadPatchs.TotalMilliseconds - timerLoadAlias.TotalMilliseconds:N}\n" +
+                    patchTimerMsg +
+                    $"\t- custom Location: {(sw.Elapsed.TotalMilliseconds - timerLoadPatchs.TotalMilliseconds):N}"));
             }
+            this.Monitor.Log("LoadContentPack TSV Start");
+            this.Monitor.Log("Content Pack\tTotal Duration\tLoad Token\tLoad Alias\tLoad Patches (Total)\tLoad Patches (FakePatchContext)\tLoad Patches (PreprocessPatches)\tLoad Patches (Actual Load)\tLoad Patches (Reindex)\tLoad CustomLocation");
+            loadInfo.OrderByDescending(row => row.TotalDuration).ToList().ForEach(row => this.Monitor.Log(row.msg));
+            this.Monitor.Log("LoadContentPacks TSV End");
 
             this.CustomLocationManager.EnforceUniqueNames();
 
@@ -381,13 +412,15 @@ namespace ContentPatcher.Framework
 
             // update patches
             this.PatchLoader.UnloadPatchesLoadedBy(contentPack, false);
+            var indentedWriter = new IndentedTextWriter();
             this.PatchLoader.LoadPatches(
                 contentPack: contentPack,
                 rawPatches: contentPack.Content.Changes,
                 rootIndexPath: new[] { contentPack.Index },
                 path: contentPack.LogPath,
                 reindex: true,
-                parentPatch: null
+                parentPatch: null,
+                ref indentedWriter
             );
         }
 

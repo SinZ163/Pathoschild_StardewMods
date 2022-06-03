@@ -89,7 +89,7 @@ namespace ContentPatcher.Framework
         }
 
         /// <inheritdoc />
-        bool IContextual.UpdateContext(IContext context)
+        bool IContextual.UpdateContext(IContext context, ref IndentedTextWriter diagnostics)
         {
             return this.UpdateContext(context, update: null, countChange: null);
         }
@@ -109,8 +109,8 @@ namespace ContentPatcher.Framework
             {
                 if (update?.Invoke(contextual) == false)
                     continue;
-
-                if (contextual.UpdateContext(context) && countChange?.Invoke(contextual) != false)
+                var writer = new IndentedTextWriter();
+                if (contextual.UpdateContext(context, ref writer) && countChange?.Invoke(contextual) != false)
                     changed = true;
 
                 if (!contextual.IsReady)

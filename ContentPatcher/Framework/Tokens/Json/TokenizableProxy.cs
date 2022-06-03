@@ -35,9 +35,9 @@ namespace ContentPatcher.Framework.Tokens.Json
         }
 
         /// <inheritdoc />
-        public bool UpdateContext(IContext context)
+        public bool UpdateContext(IContext context, ref IndentedTextWriter diagnostics)
         {
-            bool changed = this.TokenString.UpdateContext(context);
+            bool changed = this.TokenString.UpdateContext(context, ref diagnostics);
             this.SetValue(this.TokenString.Value!);
             return changed;
         }

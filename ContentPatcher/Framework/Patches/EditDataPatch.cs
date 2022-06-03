@@ -124,10 +124,10 @@ namespace ContentPatcher.Framework.Patches
         }
 
         /// <inheritdoc />
-        public override bool UpdateContext(IContext context)
+        public override bool UpdateContext(IContext context, ref IndentedTextWriter diagnostics)
         {
             // need to reload data for legacy FromFile
-            if (this.HasFromAsset && (this.ManagedRawFromAsset.UpdateContext(context) || !this.HasEverLoadedFromFile))
+            if (this.HasFromAsset && (this.ManagedRawFromAsset.UpdateContext(context, ref diagnostics) || !this.HasEverLoadedFromFile))
             {
                 this.HasEverLoadedFromFile = true;
 
@@ -136,7 +136,7 @@ namespace ContentPatcher.Framework.Patches
                     .Remove(this.Records)
                     .Remove(this.Fields)
                     .Remove(this.MoveRecords);
-                base.UpdateContext(context);
+                base.UpdateContext(context, ref diagnostics);
 
                 // reload data
                 this.Records = Array.Empty<EditDataPatchRecord>();
@@ -167,7 +167,7 @@ namespace ContentPatcher.Framework.Patches
             }
 
             // no custom logic needed
-            return base.UpdateContext(context);
+            return base.UpdateContext(context, ref diagnostics);
         }
 
         /// <inheritdoc />

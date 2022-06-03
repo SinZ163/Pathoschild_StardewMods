@@ -62,7 +62,7 @@ namespace ContentPatcher.Framework.Tokens.ValueProviders.Players
             : this(type, player => BaseValueProvider.WrapOptionalValue(value(player)), saveReader, mayReturnMultipleValues, allowedValues) { }
 
         /// <inheritdoc />
-        public override bool UpdateContext(IContext context)
+        public override bool UpdateContext(IContext context, ref IndentedTextWriter diagnostics)
         {
             return this.IsChanged(() =>
             {

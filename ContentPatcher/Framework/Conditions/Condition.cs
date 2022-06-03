@@ -80,7 +80,7 @@ namespace ContentPatcher.Framework.Conditions
         }
 
         /// <inheritdoc />
-        public bool UpdateContext(IContext context)
+        public bool UpdateContext(IContext context, ref IndentedTextWriter diagnostics)
         {
             // skip unneeded updates
             if (!this.IsMutable && this.Contextuals.WasEverUpdated)

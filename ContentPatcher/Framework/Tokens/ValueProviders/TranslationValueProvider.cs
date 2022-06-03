@@ -36,7 +36,7 @@ namespace ContentPatcher.Framework.Tokens.ValueProviders
         }
 
         /// <inheritdoc />
-        public override bool UpdateContext(IContext context)
+        public override bool UpdateContext(IContext context, ref IndentedTextWriter diagnostics)
         {
             if (this.TranslationHelper.LocaleEnum == this.LastLocale)
                 return false;

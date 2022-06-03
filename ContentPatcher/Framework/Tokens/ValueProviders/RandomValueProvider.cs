@@ -32,11 +32,11 @@ namespace ContentPatcher.Framework.Tokens.ValueProviders
         }
 
         /// <inheritdoc />
-        public override bool UpdateContext(IContext context)
+        public override bool UpdateContext(IContext context, ref IndentedTextWriter diagnostics)
         {
             int oldSeed = this.BaseSeed;
             this.BaseSeed = this.GenerateBaseSeed();
-            return base.UpdateContext(context) || this.BaseSeed != oldSeed;
+            return base.UpdateContext(context, ref diagnostics) || this.BaseSeed != oldSeed;
         }
 
         /// <inheritdoc />

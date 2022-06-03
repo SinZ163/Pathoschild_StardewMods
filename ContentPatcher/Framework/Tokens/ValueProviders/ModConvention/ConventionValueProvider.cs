@@ -108,7 +108,7 @@ namespace ContentPatcher.Framework.Tokens.ValueProviders.ModConvention
         }
 
         /// <inheritdoc />
-        public bool UpdateContext(IContext context)
+        public bool UpdateContext(IContext context, ref IndentedTextWriter diagnostics)
         {
             bool wasReady = this.IsReady;
 

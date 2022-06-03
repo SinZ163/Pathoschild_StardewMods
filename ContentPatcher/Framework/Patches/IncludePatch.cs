@@ -72,7 +72,7 @@ namespace ContentPatcher.Framework.Patches
         }
 
         /// <inheritdoc />
-        public override bool UpdateContext(IContext context)
+        public override bool UpdateContext(IContext context, ref IndentedTextWriter diagnostics)
         {
             this.PatchesJustLoaded = null;
 
@@ -142,7 +142,8 @@ namespace ContentPatcher.Framework.Patches
                         rootIndexPath: this.IndexPath,
                         path: this.GetIncludedLogPath(this.FromAsset),
                         reindex: false,
-                        parentPatch: this
+                        parentPatch: this,
+                        ref diagnostics
                     );
                     this.IsApplied = true;
                 }
@@ -173,7 +174,8 @@ namespace ContentPatcher.Framework.Patches
         private bool UpdateContext(IContext context, out string? previousFilePath)
         {
             previousFilePath = this.AttemptedDataLoad && this.IsReady && this.FromAssetExists() ? this.FromAsset : null;
-            return base.UpdateContext(context);
+            var writer = new IndentedTextWriter();
+            return base.UpdateContext(context, ref writer);
         }
 
         /// <summary>Get whether two include paths are equivalent.</summary>

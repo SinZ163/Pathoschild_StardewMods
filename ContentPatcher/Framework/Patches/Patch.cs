@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
@@ -109,12 +110,13 @@ namespace ContentPatcher.Framework.Patches
         ** Public methods
         *********/
         /// <inheritdoc />
-        public virtual bool UpdateContext(IContext context)
+        public virtual bool UpdateContext(IContext context, ref IndentedTextWriter diagnostics)
         {
             // skip unneeded updates
             if (!this.IsMutable && this.Contextuals.WasEverUpdated)
                 return false;
-
+            var sw = new Stopwatch();
+            sw.Restart();
             // reset
             bool wasReady = this.IsReady;
             this.State.Reset();
@@ -131,6 +133,8 @@ namespace ContentPatcher.Framework.Patches
             else
                 changed |= this.UpdateTargetPath(this.PrivateContext) | this.UpdateFromFile(this.PrivateContext);
             isReady &= this.RawTargetAsset?.IsReady != false && this.RawFromAsset?.IsReady != false;
+
+            var timerRawReady = new TimeSpan(sw.Elapsed.Ticks);
 
             // update contextuals
             if (isReady)
@@ -150,6 +154,7 @@ namespace ContentPatcher.Framework.Patches
                 isReady &= this.Contextuals.IsReady && (!this.Conditions.Any() || this.Conditions.All(p => p.IsMatch));
                 this.FromAssetExistsImpl = false;
             }
+            var timerContextual = new TimeSpan(sw.Elapsed.Ticks);
 
             // check from asset existence
             if (isReady && this.HasFromAsset && this.FromAsset != null)
@@ -161,6 +166,9 @@ namespace ContentPatcher.Framework.Patches
 
             // update
             this.IsReady = isReady;
+            sw.Stop();
+            ModEntry.StaticMonitor.VerboseLog($"\t\tPatch.UpdateContext took: \t{sw.Elapsed.TotalMilliseconds:N}\t{this.TargetAsset}\t{this.Path}\t{changed}\t{wasReady}\t{isReady}\t" +
+                $"\t{timerRawReady.TotalMilliseconds:N}\t{(timerContextual.TotalMilliseconds-timerRawReady.TotalMilliseconds):N}\t{(sw.Elapsed.TotalMilliseconds-timerContextual.TotalMilliseconds):N}");
             if (changed || this.IsReady != wasReady)
                 return this.MarkUpdated();
 
@@ -290,8 +298,8 @@ namespace ContentPatcher.Framework.Patches
         {
             if (!this.HasTargetAsset)
                 return false;
-
-            bool changed = this.ManagedRawTargetAsset.UpdateContext(context);
+            var writer = new IndentedTextWriter();
+            bool changed = this.ManagedRawTargetAsset.UpdateContext(context, ref writer);
 
             if (this.RawTargetAsset.IsReady)
             {
@@ -323,9 +331,9 @@ namespace ContentPatcher.Framework.Patches
                 context.SetLocalValue(nameof(ConditionType.FromFile), "");
                 return false;
             }
-
+            var writer = new IndentedTextWriter();
             // update
-            bool changed = this.ManagedRawFromAsset.UpdateContext(context);
+            bool changed = this.ManagedRawFromAsset.UpdateContext(context, ref writer);
             if (this.RawFromAsset.IsReady)
             {
                 this.FromAsset = this.NormalizeLocalAssetPath(this.RawFromAsset.Value!, logName: $"{nameof(PatchConfig.FromFile)} field");

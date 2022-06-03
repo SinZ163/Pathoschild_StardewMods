@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using ContentPatcher.Framework.Conditions;
@@ -121,18 +122,26 @@ namespace ContentPatcher.Framework
         {
             this.UpdateTick++;
 
+            var sw = Stopwatch.StartNew();
+            var tokenStopwatchs = new List<(IToken, Stopwatch, bool)>(this.GlobalContext.Tokens.Count);
+
             // update tokens
             {
                 MutableInvariantSet changedTokens = new();
 
+
                 // update global tokens
                 foreach (IToken token in this.GlobalContext.Tokens.Values)
                 {
+                    var innerSw = Stopwatch.StartNew();
+                    var writer = new IndentedTextWriter();
                     bool changed =
-                        (token.IsMutable && token.UpdateContext(this)) // token changed state/value
+                        (token.IsMutable && token.UpdateContext(this, ref writer)) // token changed state/value
                         || (this.IsFirstUpdate && token.IsReady); // tokens implicitly change to ready on their first update, even if they were ready from creation
                     if (changed)
                         changedTokens.Add(token.Name);
+                    innerSw.Stop();
+                    tokenStopwatchs.Add((token, innerSw, changed));
                 }
 
                 // special case: language change implies i18n change
@@ -141,12 +150,20 @@ namespace ContentPatcher.Framework
 
                 changedGlobalTokens = changedTokens.Lock();
             }
+            var timerUpdate = new TimeSpan(sw.Elapsed.Ticks);
 
             // update mod contexts
             foreach (CachedContext cached in this.LocalTokens.Values)
                 cached.Context.UpdateContext(changedGlobalTokens);
 
             this.IsFirstUpdate = false;
+
+            sw.Stop();
+            ModEntry.StaticMonitor.Log($@"TokenManager took {sw.Elapsed.TotalMilliseconds:N}ms
+	-UpdateTokens:  {timerUpdate.TotalMilliseconds:N}
+	-ContextUpdate: {(sw.Elapsed.TotalMilliseconds - timerUpdate.TotalMilliseconds):N}");
+            var diagStrings = tokenStopwatchs.Select(row => $"\t - {row.Item1.Name} - {row.Item2.Elapsed.TotalMilliseconds:N}ms (changed: {row.Item3})");
+            ModEntry.StaticMonitor.Log($"TokenManger UpdateToken deepdive:\n" + string.Join('\n', diagStrings));
         }
 
         /****

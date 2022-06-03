@@ -56,9 +56,9 @@ namespace ContentPatcher.Framework.Tokens
         }
 
         /// <inheritdoc />
-        public virtual bool UpdateContext(IContext context)
+        public virtual bool UpdateContext(IContext context, ref IndentedTextWriter diagnostics)
         {
-            return this.Values.UpdateContext(context);
+            return this.Values.UpdateContext(context, ref diagnostics);
         }
 
         /// <inheritdoc />

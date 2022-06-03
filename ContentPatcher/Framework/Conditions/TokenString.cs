@@ -137,7 +137,7 @@ namespace ContentPatcher.Framework.Conditions
         }
 
         /// <inheritdoc />
-        public bool UpdateContext(IContext context)
+        public bool UpdateContext(IContext context, ref IndentedTextWriter diagnostics)
         {
             return this.UpdateContext(context, forceUpdate: false);
         }
@@ -305,7 +305,8 @@ namespace ContentPatcher.Framework.Conditions
                         // get token input
                         if (part.Input != null)
                         {
-                            part.Input.UpdateContext(context);
+                            var writer = new IndentedTextWriter();
+                            part.Input.UpdateContext(context, ref writer);
                             if (!part.Input.IsReady)
                             {
                                 state.MergeFrom(part.Input.GetDiagnosticState());

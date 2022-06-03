@@ -1,5 +1,7 @@
 using System;
+using System.CodeDom.Compiler;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using ContentPatcher.Framework.Conditions;
@@ -70,14 +72,16 @@ namespace ContentPatcher.Framework
         /// <param name="reindex">Whether to reindex the patch list immediately.</param>
         /// <param name="parentPatch">The parent <see cref="PatchType.Include"/> patch for which the patches are being loaded, if any.</param>
         /// <returns>Returns the patches that were loaded.</returns>
-        public IEnumerable<IPatch> LoadPatches(RawContentPack contentPack, PatchConfig?[] rawPatches, int[] rootIndexPath, LogPathBuilder path, bool reindex, Patch? parentPatch)
+        public IEnumerable<IPatch> LoadPatches(RawContentPack contentPack, PatchConfig?[] rawPatches, int[] rootIndexPath, LogPathBuilder path, bool reindex, Patch? parentPatch, ref IndentedTextWriter diagnostics)
         {
+            var sw = Stopwatch.StartNew();
             // get fake patch context (so patch tokens are available in patch validation)
             ModTokenContext modContext = this.TokenManager.TrackLocalTokens(contentPack.ContentPack);
             LocalContext fakePatchContext = new LocalContext(contentPack.Manifest.UniqueID, parentContext: modContext);
             foreach (ConditionType type in InternalConstants.FromFileTokens.Concat(InternalConstants.TargetTokens))
                 fakePatchContext.SetLocalValue(type.ToString(), InternalConstants.TokenPlaceholder);
 
+            var timerTokenContext = new TimeSpan(sw.Elapsed.Ticks);
             // get token parser for fake context
             TokenParser tokenParser = new TokenParser(fakePatchContext, contentPack.Manifest, contentPack.Migrator, this.InstalledMods);
 
@@ -85,22 +89,36 @@ namespace ContentPatcher.Framework
             PatchConfig[] patches = this.SplitPatches(rawPatches.WhereNotNull()).ToArray();
             this.UniquelyNamePatches(patches);
 
+            var timerPreprocess = new TimeSpan(sw.Elapsed.Ticks);
             // load patches
             int index = -1;
             IList<IPatch> loadedPatches = new List<IPatch>(patches.Length);
+            var innerMsgs = new List<(TimeSpan, string)>(patches.Length);
             foreach (PatchConfig patch in patches)
             {
                 index++;
                 var localPath = path.With(patch.LogName!);
                 this.Monitor.VerboseLog($"   loading {localPath}...");
-                IPatch? loaded = this.LoadPatch(contentPack, patch, tokenParser, rootIndexPath.Concat(new[] { index }).ToArray(), localPath, reindex: false, parentPatch, logSkip: reasonPhrase => this.Monitor.Log($"Ignored {localPath}: {reasonPhrase}", LogLevel.Warn));
+                var innerTextWriter = new IndentedTextWriter();
+                innerTextWriter.Indent = diagnostics?.Indent + 1 ?? 1;
+                IPatch? loaded = this.LoadPatch(contentPack, patch, tokenParser, rootIndexPath.Concat(new[] { index }).ToArray(), localPath, reindex: false, parentPatch, logSkip: reasonPhrase => this.Monitor.Log($"Ignored {localPath}: {reasonPhrase}", LogLevel.Warn), out TimeSpan duration, ref innerTextWriter);
                 if (loaded != null)
                     loadedPatches.Add(loaded);
+                innerMsgs.Add((duration, innerTextWriter.ToString()));
             }
 
+            var timerPatch = new TimeSpan(sw.Elapsed.Ticks);
             // rebuild indexes
             if (reindex)
                 this.PatchManager.Reindex(patchListChanged: true);
+            sw.Stop();
+
+            diagnostics.WriteLine($"- tokenContext: {timerTokenContext.TotalMilliseconds:N}");
+            diagnostics.WriteLine($"- preProcess: {(timerPreprocess.TotalMilliseconds - timerTokenContext.TotalMilliseconds):N}");
+            diagnostics.WriteLine($"- reIndex: {(sw.Elapsed.TotalMilliseconds - timerPatch.TotalMilliseconds):N}");
+            diagnostics.WriteLine($"- patchCount: Total #{patches.Length}, Loaded #{loadedPatches.Count}");
+            diagnostics.WriteLine($"- innerPatch: {(timerPatch.TotalMilliseconds - timerPreprocess.TotalMilliseconds):N}");
+            diagnostics.WriteLineNoTabs(string.Join('\n', innerMsgs.OrderByDescending(row => row.Item1.TotalMilliseconds).Select(row => row.Item2).ToArray()));
 
             return loadedPatches;
         }
@@ -340,8 +358,10 @@ namespace ContentPatcher.Framework
         /// <param name="parentPatch">The parent <see cref="PatchType.Include"/> patch for which the patches are being loaded, if any.</param>
         /// <param name="logSkip">The callback to invoke with the error reason if loading it fails.</param>
         /// <returns>The patch that was loaded, or <c>null</c> if it failed to load.</returns>
-        private IPatch? LoadPatch(RawContentPack rawContentPack, PatchConfig entry, TokenParser tokenParser, int[] indexPath, LogPathBuilder path, bool reindex, Patch? parentPatch, Action<string> logSkip)
+        private IPatch? LoadPatch(RawContentPack rawContentPack, PatchConfig entry, TokenParser tokenParser, int[] indexPath, LogPathBuilder path, bool reindex, Patch? parentPatch, Action<string> logSkip, out TimeSpan duration, ref IndentedTextWriter diagnostics)
         {
+            var sw = Stopwatch.StartNew();
+            duration = sw.Elapsed;
             var pack = rawContentPack.ContentPack;
             PatchType? action = null;
 
@@ -431,7 +451,7 @@ namespace ContentPatcher.Framework
                     if (fromAsset.UsesTokens(InternalConstants.TargetTokens) && targetAsset?.UsesTokens(InternalConstants.FromFileTokens) == true)
                         return TrackSkip($"circular field reference: {nameof(entry.Target)} field can't use the '{string.Join("', '", InternalConstants.FromFileTokens)}' tokens if the {nameof(entry.FromFile)} field uses '{string.Join("', '", InternalConstants.TargetTokens)}' tokens.");
                 }
-
+                var timerPreInstance = new TimeSpan(sw.Elapsed.Ticks);
                 // get patch instance
                 IPatch patch;
                 switch (action)
@@ -724,6 +744,7 @@ namespace ContentPatcher.Framework
                         return TrackSkip($"unsupported patch type '{action}'");
                 }
 
+                var timerInstance = new TimeSpan(sw.Elapsed.Ticks);
                 // skip if not enabled
                 // note: we process the patch even if it's disabled, so any errors are caught by the mod author instead of only failing after the patch is enabled.
                 if (!enabled)
@@ -747,9 +768,21 @@ namespace ContentPatcher.Framework
                             return TrackSkip($"can't use the {{{{{type}}}}} token because the patch has no {nameof(PatchConfig.Target)} field.");
                     }
                 }
+                var timerHighLevelIssues = new TimeSpan(sw.Elapsed.Ticks);
 
                 // save patch
-                this.PatchManager.Add(patch, reindex);
+                var patchManagerInnerWriter = new IndentedTextWriter();
+                patchManagerInnerWriter.Indent = diagnostics.Indent + 1;
+                this.PatchManager.Add(patch, ref patchManagerInnerWriter, reindex);
+
+                sw.Stop();
+                duration = sw.Elapsed;
+                diagnostics.WriteLine($"Patch '{entry.LogName}' of type '{action}' took {sw.Elapsed.TotalMilliseconds:N}ms");
+                diagnostics.WriteLine($"- preInstance: {timerPreInstance.TotalMilliseconds:N}");
+                diagnostics.WriteLine($"- instanceCctr: {(timerInstance.TotalMilliseconds - timerPreInstance.TotalMilliseconds):N}");
+                diagnostics.WriteLine($"- highLevelIssue: {(timerHighLevelIssues.TotalMilliseconds - timerInstance.TotalMilliseconds):N}");
+                diagnostics.WriteLine($"- patchManagerAdd: {(sw.Elapsed.TotalMilliseconds - timerHighLevelIssues.TotalMilliseconds):N}");
+                diagnostics.WriteLineNoTabs(patchManagerInnerWriter.ToString());
                 return patch;
             }
             catch (Exception ex)

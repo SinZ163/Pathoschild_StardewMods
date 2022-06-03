@@ -77,6 +77,7 @@ namespace ContentPatcher.Framework.Commands.Commands
                 this.Monitor.Log($"Failed to reload content pack '{pack.Manifest.Name}' for configuration changes: {loadContentError}. The content pack may not be in a valid state.", LogLevel.Error); // should never happen
                 return;
             }
+            var indentedWriter = new IndentedTextWriter();
 
             // reload patches
             patchLoader.LoadPatches(
@@ -85,7 +86,8 @@ namespace ContentPatcher.Framework.Commands.Commands
                 rootIndexPath: new[] { pack.Index },
                 path: new LogPathBuilder(pack.Manifest.Name),
                 reindex: true,
-                parentPatch: null
+                parentPatch: null,
+                ref indentedWriter
             );
 
             // make the changes apply

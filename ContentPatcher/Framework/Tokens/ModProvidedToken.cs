@@ -48,11 +48,11 @@ namespace ContentPatcher.Framework.Tokens
         }
 
         /// <inheritdoc />
-        public override bool UpdateContext(IContext context)
+        public override bool UpdateContext(IContext context, ref IndentedTextWriter diagnostics)
         {
             try
             {
-                return base.UpdateContext(context);
+                return base.UpdateContext(context, ref diagnostics);
             }
             catch (Exception ex)
             {
