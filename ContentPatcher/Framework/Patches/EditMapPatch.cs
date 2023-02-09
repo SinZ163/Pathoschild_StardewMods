@@ -15,6 +15,7 @@ using xTile.Dimensions;
 using xTile.Layers;
 using xTile.ObjectModel;
 using xTile.Tiles;
+using static StardewValley.Menus.CharacterCustomization;
 using Rectangle = Microsoft.Xna.Framework.Rectangle;
 
 namespace ContentPatcher.Framework.Patches
@@ -112,6 +113,7 @@ namespace ContentPatcher.Framework.Patches
         /// <inheritdoc />
         public override void Edit<T>(IAssetData asset)
         {
+            using var profilerA = ModEntry.Profiler.RecordSection("ContentPatcher.EditMapPatch", this.Path.ToString());
             // validate
             if (typeof(T) != typeof(Map))
             {
@@ -200,6 +202,7 @@ namespace ContentPatcher.Framework.Patches
         /// <returns>Returns whether applying the patch succeeded.</returns>
         private bool TryApplyMapPatch(Map source, IAssetDataForMap targetAsset, [NotNullWhen(false)] out string? error)
         {
+            using var profilerA = ModEntry.Profiler.RecordSection("ContentPatcher.TryApplyMapPatch", source.assetPath + "@" + this.PatchMode.ToString());
             // read data
             Rectangle mapBounds = this.GetMapArea(source);
             if (!this.TryReadArea(this.FromArea, 0, 0, mapBounds.Width, mapBounds.Height, out Rectangle sourceArea, out error))
@@ -234,6 +237,7 @@ namespace ContentPatcher.Framework.Patches
         /// <returns>Returns whether applying the patch succeeded.</returns>
         private bool TryApplyTile(Map map, EditMapPatchTile tilePatch, [NotNullWhen(false)] out string? error)
         {
+            using var profilerA = ModEntry.Profiler.RecordSection("ContentPatcher.TryApplyTile", $"{tilePatch.Position.X},{tilePatch.Position.Y}");
             // parse tile data
             if (!this.TryReadTile(tilePatch, out string? layerName, out Location position, out int? setIndex, out string? setTilesheetId, out IDictionary<string, string?> setProperties, out bool removeTile, out error))
                 return this.Fail(error, out error);

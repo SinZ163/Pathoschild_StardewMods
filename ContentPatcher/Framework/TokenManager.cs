@@ -128,6 +128,7 @@ namespace ContentPatcher.Framework
                 // update global tokens
                 foreach (IToken token in this.GlobalContext.Tokens.Values)
                 {
+                    using var profilerA = ModEntry.Profiler.RecordSection("TokenManager.UpdateContext.GlobalContext", token.Name);
                     bool changed =
                         (token.IsMutable && token.UpdateContext(this)) // token changed state/value
                         || (this.IsFirstUpdate && token.IsReady); // tokens implicitly change to ready on their first update, even if they were ready from creation

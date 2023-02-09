@@ -179,6 +179,7 @@ namespace ContentPatcher.Framework
             while (patchQueue.Any())
             {
                 IPatch patch = patchQueue.Dequeue();
+                using var profilerPatchQueue = ModEntry.Profiler.RecordSection("PatchManager.UpdateContext.PatchQueue", patch.Path.ToString());
 
                 // log asset name
                 if (verbose && prevAssetName != patch.TargetAsset)

@@ -216,6 +216,7 @@ namespace ContentPatcher.Framework
             foreach (LoadedContentPack current in contentPacks)
             {
                 this.Monitor.VerboseLog($"Loading content pack '{current.Manifest.Name}'...");
+                using var profileA = ModEntry.Profiler.RecordSection("LoadContentPacks", current.Manifest.Name);
 
                 try
                 {

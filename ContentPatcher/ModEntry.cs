@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.CompilerServices;
+using Common.Integrations.Profiler;
 using ContentPatcher.Framework;
 using ContentPatcher.Framework.Api;
 using ContentPatcher.Framework.Commands;
@@ -32,6 +34,8 @@ namespace ContentPatcher
 
         /// <summary>The raw data for loaded content packs.</summary>
         private LoadedContentPack[]? ContentPacks;
+
+        internal static ProfilerIntegration Profiler;
 
         /// <summary>The recognized format versions and their migrations.</summary>
         private readonly Func<ContentConfig?, IMigration[]> GetFormatVersions = content => new IMigration[]
@@ -251,6 +255,8 @@ namespace ContentPatcher
         private void Initialize()
         {
             var helper = this.Helper;
+
+            Profiler = new ProfilerIntegration(helper.ModRegistry, this.Monitor);
 
             // fetch content packs
             this.ContentPacks = this.GetContentPacks().ToArray();
