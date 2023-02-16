@@ -101,6 +101,7 @@ namespace ContentPatcher.Framework
         /// <returns>Returns whether the instance changed.</returns>
         public bool UpdateContext(IContext context, Func<IContextual, bool>? update = null, Func<IContextual, bool>? countChange = null)
         {
+            using var profilerA = ModEntry.Profiler.RecordSection("ContentPatcher.AggregateContextural.UpdateContext", "");
             bool wasReady = this.IsReady;
             this.IsReady = true;
 

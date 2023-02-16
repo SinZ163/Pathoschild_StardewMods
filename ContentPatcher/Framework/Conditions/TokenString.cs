@@ -195,6 +195,7 @@ namespace ContentPatcher.Framework.Conditions
         {
             if (!forceUpdate && !this.ShouldUpdate())
                 return false;
+            using var profilerA = ModEntry.Profiler.RecordSection("ContentPatcher.TokenString.UpdateContext", this.Path.ToString());
 
             // reset
             string? wasValue = this.Value;

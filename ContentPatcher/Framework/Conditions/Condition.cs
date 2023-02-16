@@ -85,6 +85,7 @@ namespace ContentPatcher.Framework.Conditions
             // skip unneeded updates
             if (!this.IsMutable && this.Contextuals.WasEverUpdated)
                 return false;
+            using var profilerA = ModEntry.Profiler.RecordSection("ContentPatcher.Condition.UpdateContext", this.Name);
 
             // reset
             bool wasReady = this.IsReady;
