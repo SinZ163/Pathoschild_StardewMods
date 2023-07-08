@@ -31,7 +31,7 @@ namespace ContentPatcher.Framework.Migrations
         /// <param name="patches">The patch data to migrate.</param>
         /// <param name="error">An error message which indicates why migration failed.</param>
         /// <returns>Returns whether migration succeeded.</returns>
-        bool TryMigrate(ref PatchConfig[] patches, [NotNullWhen(false)] out string? error);
+        bool TryMigrate(ref PatchConfig[] patches, string UniqueId, [NotNullWhen(false)] out string? error);
 
         /// <summary>Migrate a lexical token.</summary>
         /// <param name="lexToken">The lexical token to migrate.</param>

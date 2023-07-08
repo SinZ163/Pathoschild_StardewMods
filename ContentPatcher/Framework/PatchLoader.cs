@@ -92,7 +92,7 @@ namespace ContentPatcher.Framework
 
             // apply patch-list migrations
             // lower-level migrations are applied in LoadPatch below
-            if (!contentPack.Migrator.TryMigrate(ref patches, out string? error))
+            if (!contentPack.Migrator.TryMigrate(ref patches, contentPack.Manifest.UniqueID, out string? error))
             {
                 this.Monitor.Log($"Ignored {path}: {error}", LogLevel.Warn);
                 return Array.Empty<IPatch>();

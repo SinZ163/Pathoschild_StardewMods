@@ -73,13 +73,20 @@ namespace ContentPatcher.Framework.Migrations
         }
 
         /// <inheritdoc />
-        public bool TryMigrate(ref PatchConfig[] patches, [NotNullWhen(false)] out string? error)
+        public bool TryMigrate(ref PatchConfig[] patches, string UniqueId, [NotNullWhen(false)] out string? error)
         {
             // apply migrations
             foreach (IMigration migration in this.Migrations)
             {
-                if (!migration.TryMigrate(ref patches, out error))
+                try
+                {
+                    if (!migration.TryMigrate(ref patches, UniqueId, out error))
+                        return false;
+                } catch (Exception e)
+                {
+                    error = e.ToString();
                     return false;
+                }
             }
 
             // no issues found

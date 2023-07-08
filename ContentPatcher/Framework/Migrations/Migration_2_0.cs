@@ -1,12 +1,18 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 using ContentPatcher.Framework.Conditions;
 using ContentPatcher.Framework.ConfigModels;
 using ContentPatcher.Framework.Lexing;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Serialization;
 using Pathoschild.Stardew.Common;
+using Pathoschild.Stardew.Common.Utilities;
 using StardewModdingAPI;
 using StardewModdingAPI.Utilities;
 using InnerPatch = Pathoschild.Stardew.Common.Utilities.InvariantDictionary<Newtonsoft.Json.Linq.JToken?>;
@@ -33,6 +39,8 @@ namespace ContentPatcher.Framework.Migrations
         /// <summary>Handles parsing raw strings into tokens.</summary>
         private readonly Lexer Lexer = Lexer.Instance;
 
+        private static Dictionary<string,int> patchCount = new();
+
         /*********
         ** Public methods
         *********/
@@ -42,9 +50,9 @@ namespace ContentPatcher.Framework.Migrations
             : base(new SemanticVersion(2, 0, 0)) { }
 
         /// <inheritdoc />
-        public override bool TryMigrate(ref PatchConfig[] patches, [NotNullWhen(false)] out string? error)
+        public override bool TryMigrate(ref PatchConfig[] patches, string UniqueId, [NotNullWhen(false)] out string? error)
         {
-            if (!base.TryMigrate(ref patches, out error))
+            if (!base.TryMigrate(ref patches, UniqueId, out error))
                 return false;
 
             // 2.0 adds Priority
@@ -57,7 +65,27 @@ namespace ContentPatcher.Framework.Migrations
                 }
             }
 
+            string[] OldAssetTypes = ["Data/NPCDispositions", "Data/Locations", "Data/ObjectInformation", "Data/BigCraftableInformation", "Data/Crops"];
+            string[] NewAssetTypes = ["Data/Characters", "Data/Locations", "Data/Objects", "Data/BigCraftables", "Data/Crops"];
+
+            string modId = string.Join("-", UniqueId.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
+            foreach (string assetType in OldAssetTypes)
+            {
+                if (patches.Where(patch => PathUtilities.NormalizeAssetName(patch.Target) == assetType).Any() == false) continue;
+                File.WriteAllText(Path.Combine(StardewModdingAPI.Constants.GamePath, "mod-export", $"{modId}_{patchCount.GetValueOrDefault(modId, 0)}_{assetType.Replace('/', '_')}_old.json"), JsonConvert.SerializeObject(
+                    patches.Where(patch => PathUtilities.NormalizeAssetName(patch.Target) == assetType),
+                Formatting.Indented,
+                new JsonSerializerSettings()
+                {
+                    DefaultValueHandling = DefaultValueHandling.Ignore,
+                    ContractResolver = ShouldSerializeContractResolver.Instance,
+                }
+            ));
+            }
+
             Dictionary<PatchConfig, (bool Replace, List<PatchConfig> Patches)> replacementMap = new();
+
+            bool edited = false;
 
             foreach (PatchConfig? patch in patches)
             {
@@ -65,6 +93,7 @@ namespace ContentPatcher.Framework.Migrations
                 {
                     if (PathUtilities.NormalizeAssetName(patch.Target) == "Data/NPCDispositions")
                     {
+                        edited = true;
                         patch.Target = "Data/Characters";
                         if (patch.TargetField.Count > 0)
                         {
@@ -156,6 +185,7 @@ namespace ContentPatcher.Framework.Migrations
                     }
                     else if (PathUtilities.NormalizeAssetName(patch.Target) == "Data/Locations")
                     {
+                        edited = true;
                         if (!this.ConvertDataModel(new DataLocationsState(new(), new(), new()), patch,
                             mapping: new()
                             {
@@ -487,6 +517,25 @@ namespace ContentPatcher.Framework.Migrations
                 }
                 patches = patchList.ToArray();
             }
+            if (edited)
+            {
+                for (int i = 0; i < NewAssetTypes.Length; i++)
+                {
+                    string assetType = OldAssetTypes[i];
+                    string newAssetType = NewAssetTypes[i];
+                    if (patches.Where(patch => PathUtilities.NormalizeAssetName(patch.Target) == newAssetType).Any() == false) continue;
+                    File.WriteAllText(Path.Combine(StardewModdingAPI.Constants.GamePath, "mod-export", $"{modId}_{patchCount.GetValueOrDefault(modId, 0)}_{assetType.Replace('/', '_')}_new.json"), JsonConvert.SerializeObject(
+                        patches.Where(patch => PathUtilities.NormalizeAssetName(patch.Target) == newAssetType),
+                    Formatting.Indented,
+                    new JsonSerializerSettings()
+                    {
+                        DefaultValueHandling = DefaultValueHandling.Ignore,
+                        ContractResolver = ShouldSerializeContractResolver.Instance,
+                    }
+                ));
+                }
+                patchCount[modId] = patchCount.GetValueOrDefault(modId, 0) + 1;
+            }
 
             return true;
         }
@@ -814,6 +863,49 @@ namespace ContentPatcher.Framework.Migrations
                 }
             }
             return args;
+        }
+    }
+
+    /// <summary>
+    /// This causes empty Collections (IEnumerable) to be ignored in Json Serialization
+    /// </summary>
+    public class ShouldSerializeContractResolver : DefaultContractResolver
+    {
+        public static readonly ShouldSerializeContractResolver Instance = new ShouldSerializeContractResolver();
+
+        protected override JsonProperty CreateProperty(MemberInfo member, MemberSerialization memberSerialization)
+        {
+            JsonProperty property = base.CreateProperty(member, memberSerialization);
+
+            if (property.PropertyType != typeof(string) &&
+                typeof(IEnumerable).IsAssignableFrom(property.PropertyType))
+            {
+                property.ShouldSerialize = instance =>
+                {
+                    IEnumerable enumerable = null;
+                    // this value could be in a public field or public property
+                    switch (member.MemberType)
+                    {
+                        case MemberTypes.Property:
+                            enumerable = instance
+                                .GetType()
+                                .GetProperty(member.Name)
+                                ?.GetValue(instance, null) as IEnumerable;
+                            break;
+                        case MemberTypes.Field:
+                            enumerable = instance
+                                .GetType()
+                                .GetField(member.Name)
+                                .GetValue(instance) as IEnumerable;
+                            break;
+                    }
+
+                    return enumerable == null ||
+                           enumerable.GetEnumerator().MoveNext();
+                    // if the list is null, we defer the decision to NullValueHandling
+                };
+            }
+            return property;
         }
     }
 }

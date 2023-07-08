@@ -18,9 +18,9 @@ namespace ContentPatcher.Framework.Migrations
             : base(new SemanticVersion(1, 28, 0)) { }
 
         /// <inheritdoc />
-        public override bool TryMigrate(ref PatchConfig[] patches, [NotNullWhen(false)] out string? error)
+        public override bool TryMigrate(ref PatchConfig[] patches, string UniqueId, [NotNullWhen(false)] out string? error)
         {
-            if (!base.TryMigrate(ref patches, out error))
+            if (!base.TryMigrate(ref patches, UniqueId, out error))
                 return false;
 
             // 1.28 adds the RemoveDelimited text operation

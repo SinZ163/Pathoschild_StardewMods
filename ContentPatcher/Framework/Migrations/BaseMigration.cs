@@ -37,7 +37,7 @@ namespace ContentPatcher.Framework.Migrations
         }
 
         /// <inheritdoc />
-        public virtual bool TryMigrate(ref PatchConfig[] patches, [NotNullWhen(false)] out string? error)
+        public virtual bool TryMigrate(ref PatchConfig[] patches, string UniqueId, [NotNullWhen(false)] out string? error)
         {
             error = null;
             return true;
