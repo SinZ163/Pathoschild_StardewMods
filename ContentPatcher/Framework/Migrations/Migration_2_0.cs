@@ -701,8 +701,8 @@ namespace ContentPatcher.Framework.Migrations
                     ["Location"] = locationParts[0],
                     ["Tile"] = new JObject()
                     {
-                        ["X"] = Convert.ToInt32(locationParts[1]) * 64,
-                        ["Y"] = Convert.ToInt32(locationParts[2]) * 64
+                        ["X"] = Convert.ToInt32(locationParts[1]),
+                        ["Y"] = Convert.ToInt32(locationParts[2])
                     }
                 }
             };
