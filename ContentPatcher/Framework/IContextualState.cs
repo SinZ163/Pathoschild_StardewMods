@@ -28,5 +28,8 @@ namespace ContentPatcher.Framework
 
         /// <summary>Error phrases indicating why the instance is not ready to use, if any.</summary>
         IInvariantSet Errors { get; }
+
+        /// <summary>The migrations that have been applied to the instance, if any.</summary>
+        IInvariantSet Migrations { get; }
     }
 }

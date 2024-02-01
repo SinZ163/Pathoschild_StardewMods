@@ -22,6 +22,9 @@ namespace ContentPatcher.Framework
         /// <summary>The backing field for <see cref="Errors"/>.</summary>
         private readonly MutableInvariantSet ErrorsImpl = new();
 
+        /// <summary>The backing field for <see cref="Migrations"/>.</summary>
+        private readonly MutableInvariantSet MigrationsImpl = new();
+
 
         /*********
         ** Accessors
@@ -46,6 +49,9 @@ namespace ContentPatcher.Framework
 
         /// <inheritdoc />
         public IInvariantSet Errors => this.ErrorsImpl.GetImmutable();
+
+        /// <inheritdoc />
+        public IInvariantSet Migrations => this.MigrationsImpl.GetImmutable();
 
 
         /*********

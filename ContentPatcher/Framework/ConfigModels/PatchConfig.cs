@@ -94,6 +94,8 @@ namespace ContentPatcher.Framework.ConfigModels
         [JsonProperty(ObjectCreationHandling = ObjectCreationHandling.Auto)]
         public List<PatchMapTileConfig?> MapTiles { get; } = new();
 
+        [JsonIgnore]
+        internal List<string> Internal_Migrations { get; } = new();
 
         /*********
         ** Public methods
@@ -115,6 +117,8 @@ namespace ContentPatcher.Framework.ConfigModels
             this.Enabled = other.Enabled;
             this.When = other.When.Clone();
             this.Priority = other.Priority;
+
+            this.Internal_Migrations = other.Internal_Migrations.ToList();
 
             // multiple actions
             this.TextOperations = other.TextOperations.Select(p => p != null ? new TextOperationConfig(p) : null).ToList();

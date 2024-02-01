@@ -33,7 +33,10 @@ namespace ContentPatcher.Framework.Migrations
             foreach (PatchConfig patch in patches)
             {
                 if (patch.When.TryGetValue(nameof(ConditionType.Weather), out string? value) && value?.Contains("Sun") == true)
+                {
                     patch.When[nameof(ConditionType.Weather)] = $"{value}, Wind";
+                    patch.Internal_Migrations.Add("Migrated Weather to implicitly include Wind");
+                }
             }
 
             return true;
