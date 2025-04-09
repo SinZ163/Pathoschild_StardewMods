@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using ContentPatcher.Experiment;
 using ContentPatcher.Framework.Conditions;
 using ContentPatcher.Framework.ConfigModels;
 using ContentPatcher.Framework.Patches;
@@ -546,6 +547,7 @@ namespace ContentPatcher.Framework
         private T? ApplyLoad<T>(LoadPatch patch, IAssetName assetName)
             where T : notnull
         {
+            using var _ = ProfilerIntegration.RecordSection(patch.ContentPack.Manifest.UniqueID, "ApplyLoad", patch.Path.ToString());
             if (this.Monitor.IsVerbose)
                 this.Monitor.Log($"Patch \"{patch.Path}\" loaded {assetName}.");
 
@@ -600,6 +602,7 @@ namespace ContentPatcher.Framework
         {
             foreach (IPatch patch in patches)
             {
+                using var _ = ProfilerIntegration.RecordSection(patch.ContentPack.Manifest.UniqueID, "ApplyEdit", patch.Path.ToString());
                 if (this.Monitor.IsVerbose)
                     this.Monitor.Log($"Applied patch \"{patch.Path}\" to {asset.Name}.");
 

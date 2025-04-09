@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using ContentPatcher.Experiment;
 using ContentPatcher.Framework;
 using ContentPatcher.Framework.Api;
 using ContentPatcher.Framework.Commands;
@@ -116,6 +117,7 @@ namespace ContentPatcher
 
             helper.Events.GameLoop.UpdateTicked += this.OnUpdateTicked;
             helper.Events.Content.LocaleChanged += this.OnLocaleChanged;
+            helper.Events.GameLoop.GameLaunched += this.GameLaunched;
 
             // enable temporary PyTK legacy mode (unless running in SMAPI strict mode)
             IModInfo? pyTk = helper.ModRegistry.Get("Platonymous.Toolkit");
@@ -123,6 +125,10 @@ namespace ContentPatcher
                 pyTk is not null
                 && pyTk.Manifest.Version.IsOlderThan("1.24.0")
                 && typeof(Constants).GetProperty("ExecutionPath") != null; // not SMAPI strict mode (which drops PyTK workarounds)
+        }
+        private void GameLaunched(object? sender, GameLaunchedEventArgs e)
+        {
+            ProfilerIntegration.Initialize(this.Helper.ModRegistry);
         }
 
         /// <summary>Get an API that other mods can access. This is always called after <see cref="Entry"/>.</summary>

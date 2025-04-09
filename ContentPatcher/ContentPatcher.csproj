@@ -2,6 +2,7 @@
   <PropertyGroup>
     <Version>2.3.0</Version>
     <RootNamespace>ContentPatcher</RootNamespace>
+    <GamePath>C:\Users\acerP\Downloads\depotdownloader-2.4.7\stardew1.6.8</GamePath>
   </PropertyGroup>
 
   <ItemGroup>
